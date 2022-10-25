@@ -13,6 +13,9 @@ import torch.nn as nn
 import scipy.sparse as sp
 import torch_geometric.utils as utils
 
+# Try micro F1 score
+from sklearn.metrics import f1_score as F1
+
 
 # Declare some helper functions
 def normalize_adj(adj):
@@ -38,6 +41,20 @@ def normalize_adj(adj):
 
 
 # Declare some helper functions
+def row_normalize(mat):
+    """
+    Row normalize the given matrix mat by its row norm
+    """
+
+    # Get the row sum
+    inv_r_sum = 1. / torch.norm(mat, dim=1, p=2)
+    inv_r_sum[inv_r_sum == torch.inf] = 0.
+
+    # Return normalized matrix
+    return mat * inv_r_sum.unsqueeze(1)
+
+
+# Declare some helper functions
 def csr_to_torch_coo(adj):
     """
     Convert csr sparse matrix to coo sparse tensor
@@ -47,8 +64,131 @@ def csr_to_torch_coo(adj):
     if sp.isspmatrix_coo(adj) is False:
         adj = sp.coo_matrix(adj)
 
-    # Get the indices
-    inds = np.array([adj.row, adj.col])
-
     # Return COO tensor matrix
-    return torch.sparse_coo_tensor(indices=inds, values=adj.data, size=adj.shape, dtype=torch.float32)
+    return torch.sparse_coo_tensor(indices=np.array([adj.row, adj.col]), values=adj.data, size=adj.shape, dtype=torch.float32)
+
+
+# Declare a training function
+def train(model: nn.Module, opt: torch.optim, X: torch.Tensor, y: torch.Tensor,
+        csr_mat: sp.csr_matrix,
+          training_mask: torch.Tensor, loss_function: nn.Module, stoch: bool, losses: list,
+          batch_list: list = None, training_indices: list = None) -> list:
+
+    # Set to train
+    model.train()
+    opt.zero_grad()
+
+    # Forward pass
+    out, init_batch = model(x=X, csr_mat=csr_mat, drop=False, stochastic=stoch,
+                            batch_sizes=batch_list, possible_training_nodes=training_indices)
+
+    # Make sure we are only grabbing training nodes computed from the FIRST batch
+    if stoch:
+        # Make training mask actually feasible
+        l = loss_function(out, y[init_batch])
+    else:
+        l = loss_function(out[training_mask], y[training_mask])
+
+    # Backward pass
+    l.backward()
+    opt.step()
+
+    # Save the losses
+    losses.append(l.item())
+
+    return losses
+
+
+# Declare a training function
+def sample_validation_test(model: nn.Module, X: torch.Tensor, y: torch.Tensor,
+                            csr_mat: sp.csr_matrix,
+                            batch_list: list, num_samp_inf: int, validation_mask: list,
+                            loss_function: nn.Module, val_losses: list) -> list:
+
+    # Set to eval
+    model.eval()
+    v_loss = 0
+
+    c = 0
+    for i in range(0, len(validation_mask), batch_list[0]):
+
+        # Get this subset of nodes to perform prediction on
+        m = validation_mask[i:i + batch_list[0]]
+
+        # Forward pass
+        out, res, init_batch = model.sample_predict(x=X, csr_mat=csr_mat,
+                                                    init_batch=m, batch_sizes=batch_list,
+                                                    num_inference_times=num_samp_inf)
+
+        # Save loss
+        v_loss += loss_function(res, y[init_batch]).detach().item()
+        c += 1
+
+    # Save the losses
+    val_losses.append(v_loss / c)
+
+    return val_losses
+
+
+# Declare a training function
+def validation_test(model: nn.Module, X: torch.Tensor, y: torch.Tensor, csr_mat: sp.csr_matrix,
+          validation_mask: torch.Tensor, loss_function: nn.Module, val_losses: list) -> list:
+
+    # Set to eval
+    model.eval()
+
+    # Get the loss
+    _, out = model.predict(X, csr_mat)
+    l = loss_function(out[validation_mask], y[validation_mask]).detach()
+
+    # Save the losses
+    val_losses.append(l.item())
+
+    return val_losses
+
+
+# Declare a testing function
+def sample_test(model: nn.Module, X: torch.Tensor, y: torch.Tensor, csr_mat: sp.csr_matrix,
+            batch_list: list, num_samp_inf: int, mask: list, accuracy: list) -> list:
+
+    # Set to test
+    model.eval()
+    acc = 0
+
+    # Loop over all of the indices
+    c = 0
+    for i in range(0, len(mask), batch_list[0]):
+
+        # Get this subset of nodes to perform prediction on
+        m = mask[i:i + batch_list[0]]
+
+        # Forward pass
+        out, res, init_batch = model.sample_predict(x=X, csr_mat=csr_mat,
+                            init_batch=m, batch_sizes=batch_list, num_inference_times=num_samp_inf)
+
+        acc += F1(y[init_batch].cpu().numpy(), out.cpu().numpy(), average='micro') * 100.0
+        c += 1
+
+    # Save the accuracy
+    accuracy.append(acc / c)
+
+    return accuracy
+
+
+# Declare a testing function
+def test(model: nn.Module, X: torch.Tensor, y: torch.Tensor, csr_mat: sp.csr_matrix,
+          mask: torch.Tensor, accuracy: list) -> list:
+
+    # Set to test
+    model.eval()
+
+    # Forward pass
+    out, _ = model.predict(X, csr_mat)
+    out = out[mask].cpu().numpy()
+    y = y[mask].cpu().numpy()
+    acc = F1(y, out, average='micro') * 100.0
+
+    # Save the accuracy
+    accuracy.append(acc)
+
+    return accuracy

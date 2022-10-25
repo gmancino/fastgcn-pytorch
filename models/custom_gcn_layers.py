@@ -37,13 +37,14 @@ class GCNLayer(nn.Module):
 
         # Initialize the weights
         nn.init.xavier_uniform_(self.weights)
-        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weights)
-
-        # Initialize the bias
-        bound = 1 / math.sqrt(fan_in)
-        nn.init.uniform_(self.bias, -bound, bound)
+        nn.init.zeros_(self.bias)
 
     def forward(self, x: torch.Tensor, adj_mat: torch.sparse.Tensor) -> torch.Tensor:
         """Do a forward pass of the network"""
 
         return torch.mm(torch.sparse.mm(adj_mat, x), self.weights) + self.bias
+
+    def precomputed_forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Do a forward pass of the network, under the assumption that AX has already been computed"""
+
+        return torch.mm(x, self.weights) + self.bias

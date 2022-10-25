@@ -9,6 +9,7 @@
 """
 
 # Import files
+import time
 import torch
 import typing
 import numpy as np
@@ -60,16 +61,15 @@ class FastGCN(nn.Module):
         # Save the sampler
         self.samp_probs = samp_probs
         self.num_nodes = num_nodes
-        self.prob_mask = torch.zeros(self.num_nodes).to(self.device)
-        self.mask = torch.zeros(self.num_nodes).to(self.device)
+        # self.tensor_probs = torch.tensor(samp_probs).to(self.device).float().unsqueeze(1) / sum(samp_probs)
 
         # Save the global adjacency matrix for full batch GCN
         self.full_adj = None
+        self.precompute = None
 
     def forward(self, x: torch.Tensor,
-                edge_list: torch.Tensor,
                 csr_mat: sp.csr_matrix,
-                drop: bool = True,
+                drop: bool = False,
                 stochastic: bool = False,
                 batch_sizes: typing.List[int] = None,
                 possible_training_nodes: list = None) -> tuple:
@@ -82,6 +82,10 @@ class FastGCN(nn.Module):
             if self.full_adj is None:
                 self.full_adj = csr_to_torch_coo(csr_mat).to(self.device)
 
+            # Perform pre-computation
+            if self.precompute is None:
+                self.precompute = torch.sparse.mm(self.full_adj, x)
+
             # No sampling is performed
             init_batch = None
 
@@ -89,7 +93,15 @@ class FastGCN(nn.Module):
             for ind, p in enumerate(self.layers):
 
                 # Check index:
-                if ind < (len(self.layers) - 1):
+                if ind == 0:
+
+                    # Dropout and activation
+                    if drop:
+                        x = self.drop(self.activation(p.precomputed_forward(self.precompute)))
+                    else:
+                        x = self.activation(p.precomputed_forward(self.precompute))
+
+                elif 0 < ind < (len(self.layers) - 1):
 
                     # Dropout and activation
                     if drop:
@@ -110,10 +122,19 @@ class FastGCN(nn.Module):
                                         replace=False)
 
             # Then compute the subgraphs
-            batch_adjs = self.get_subgraphs(init_batch=init_batch,
+            batch_adjs = self.get_subgraphs_unioned_sampling(init_batch=init_batch,
                                                      batch_sizes=batch_sizes[1:],
-                                                     edge_list=edge_list,
                                                      csr_adj_mat=csr_mat)
+
+            # Perform precomputation
+            if self.precompute is None:
+
+                # Create adjacency matrix
+                if self.full_adj is None:
+                    self.full_adj = csr_to_torch_coo(csr_mat).to(self.device)
+
+                # Save precomputation
+                self.precompute = torch.sparse.mm(self.full_adj, x)
 
             # Propagate through the network
             for ind, p in enumerate(self.layers):
@@ -123,10 +144,10 @@ class FastGCN(nn.Module):
 
                     # Dropout and activation
                     if drop:
-                        x = self.drop(self.activation(p(x, batch_adjs[ind])))
+                        x = self.drop(self.activation(p.precomputed_forward(self.precompute[batch_adjs[ind]])))
 
                     else:
-                        x = self.activation(p(x, batch_adjs[ind]))
+                        x = self.activation(p.precomputed_forward(self.precompute[batch_adjs[ind]]))
 
                 # Final layer
                 elif ind == (len(self.layers) - 1):
@@ -147,9 +168,10 @@ class FastGCN(nn.Module):
             # Return the result
         return x, init_batch
 
-    def get_subgraphs(self, init_batch: torch.Tensor, batch_sizes: typing.List[int],
-                    edge_list: torch.Tensor, csr_adj_mat: sp.csr_matrix) -> list:
-        """Get samples from each layer and create a mask of the nodes"""
+    @torch.no_grad()
+    def get_subgraphs(self, init_batch: typing.List[int], batch_sizes: typing.List[int],
+                    csr_adj_mat: sp.csr_matrix) -> list:
+        """Here we sample from just the neighbors of the current nodes"""
 
         # Create a dummy version of the batch_sizes
         batch_sizes.insert(0, 0)
@@ -158,8 +180,11 @@ class FastGCN(nn.Module):
         batch = [init_batch]
         adj_out_mats = []
 
-        # # Get the next layer of nodes
-        new_nodes, _, _, _ = utils.k_hop_subgraph(node_idx=torch.tensor(batch[0]), num_hops=1, edge_index=edge_list)
+        # Get the next layer of nodes
+        new_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+
+        # Get only the subset of nodes that are 1-hop away
+        new_nodes = np.setdiff1d(new_nodes, batch[0])
 
         # Loop over the remaining batches
         for i in range(1, len(batch_sizes)):
@@ -178,26 +203,123 @@ class FastGCN(nn.Module):
             subgraph_probs = self.samp_probs[batch[i]] / denom
 
             # Save adjmats
-            curr_adj = csr_adj_mat[batch[i - 1], :]
-            curr_adj = curr_adj[:, batch[i]].multiply(1. / (subgraph_probs * len(subgraph_probs)))
-            adj_out_mats.append(csr_to_torch_coo(curr_adj).to(self.device))
+            adj_out_mats.append(csr_to_torch_coo(csr_adj_mat[batch[i - 1], :][:, batch[i]].multiply(1. / (subgraph_probs * len(subgraph_probs)))).to(self.device))
 
             # Get the next layer of nodes
-            new_nodes, _, _, _ = utils.k_hop_subgraph(node_idx=torch.tensor(batch[i]), num_hops=1, edge_index=edge_list)
+            new_nodes = np.unique(csr_adj_mat[batch[i], :].nonzero()[1])
 
-        # Initial layer of the adjacency matrix involves pre-computation:
-        adj_out_mats.append(csr_to_torch_coo(csr_adj_mat[batch[-1], :]).to(self.device))
+            # Get only the subset of nodes that are 1-hop away
+            new_nodes = np.setdiff1d(new_nodes, batch[i])
+
+        # Initial layer of the adjacency matrix involves pre-computation,
+        # but we already store this, so we only need to slice!
+        adj_out_mats.append(batch[-1])
 
         return adj_out_mats[::-1]
 
     @torch.no_grad()
-    def predict(self, x: torch.Tensor, edge_list: torch.Tensor, csr_mat: sp.csr_matrix, ) -> tuple:
+    def get_subgraphs_unioned_sampling(self, init_batch: typing.List[int], batch_sizes: typing.List[int],
+                      csr_adj_mat: sp.csr_matrix) -> list:
+        """Here, we sample from the set of current nodes UNIONED with it's 1-hop neighbors"""
+
+        # Create a dummy version of the batch_sizes
+        batch_sizes.insert(0, 0)
+
+        # Get the initial batch
+        batch = [init_batch]
+        adj_out_mats = []
+
+        # Get the next layer of nodes
+        new_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+
+        # Loop over the remaining batches
+        for i in range(1, len(batch_sizes)):
+            # Save denominator to avoid re-computing
+            denom = sum(self.samp_probs[new_nodes])
+
+            # Save the probs
+            probs = self.samp_probs[new_nodes] / denom
+
+            # Get a batch
+            batch.append(np.random.choice(new_nodes, size=batch_sizes[i],
+                                          replace=False, p=probs))
+
+            # Create the probability distribution over these nodes
+            subgraph_probs = self.samp_probs[batch[i]] / denom
+
+            # Save adjmats
+            adj_out_mats.append(csr_to_torch_coo(
+                csr_adj_mat[batch[i - 1], :][:, batch[i]].multiply(1. / (subgraph_probs * len(subgraph_probs)))).to(
+                self.device))
+
+            # Get the next layer of nodes
+            new_nodes = np.unique(csr_adj_mat[batch[i], :].nonzero()[1])
+
+        # Initial layer of the adjacency matrix involves pre-computation,
+        # but we already store this, so we only need to slice!
+        adj_out_mats.append(batch[-1])
+
+        return adj_out_mats[::-1]
+
+    @torch.no_grad()
+    def predict(self, x: torch.Tensor, csr_mat: sp.csr_matrix) -> tuple:
         """Predict the class for a given set of points"""
 
         # Forward pass without dropout
-        x, _ = self.forward(x, edge_list, csr_mat, drop=False)
+        x, _ = self.forward(x, csr_mat, drop=False)
 
         # Find maximum value for class prediction
         pred = torch.argmax(x, dim=1)
 
         return pred, x
+
+    @torch.no_grad()
+    def sample_predict(self, x: torch.Tensor,
+                csr_mat: sp.csr_matrix,
+                init_batch: typing.List[int],
+                batch_sizes: typing.List[int],
+                num_inference_times: int = 1) -> tuple:
+        """Perform inference using sampled nodes"""
+
+        # Loop over the different attempts
+        final_res = 0
+
+        # Do a stochastic forward pass
+        for i in range(num_inference_times):
+
+            # Then compute the subgraphs
+            batch_adjs = self.get_subgraphs(init_batch=init_batch,
+                                            batch_sizes=batch_sizes[1:],
+                                            csr_adj_mat=csr_mat)
+
+            # Propagate through the network
+            for ind, p in enumerate(self.layers):
+
+                # ALWAYS perform precomputation
+                if ind == 0:
+
+                    # Activation
+                    out = self.activation(p.precomputed_forward(self.precompute[batch_adjs[ind]]))
+
+                # Final layer
+                elif ind == (len(self.layers) - 1):
+
+                    # Softmax
+                    out = self.final_activation(p(out, batch_adjs[ind]))
+
+                # Check index:
+                else:
+
+                    # Activation
+                    out = self.activation(p(out, batch_adjs[ind]))
+
+            # Save final results
+            final_res += out
+
+        # Scale
+        final_res = final_res / num_inference_times
+
+        # Find maximum value for class prediction
+        pred = torch.argmax(final_res, dim=1)
+
+        return pred, final_res, init_batch
