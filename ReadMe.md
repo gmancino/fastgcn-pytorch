@@ -61,10 +61,10 @@ We compare the current approach with the original GCN and report the _maximum te
 
 | Dataset | FastGCN | GCN |
 | --- | --- | --- |
-| Cora | 87.4% (0.82 s) | 87.2% (0.56 s) |
-| CiteSeer | 78.8% (0.62 s) | 78.7% (0.47 s) |
-| PubMed | 88.3% (1.97 s) | 88.5% (1.4 s) |
-| Reddit | 94.47% (63.2 s) | 94.8% (330.5 s) |
+| Cora | 87.4% (0.81 s) | 87.2% (0.56 s) |
+| CiteSeer | 78.4% (0.57 s) | 78.7% (0.47 s) |
+| PubMed | 88.3% (1.49 s) | 88.5% (1.4 s) |
+| Reddit | 94.4% (48.19 s) | 94.8% (330.5 s) |
 
 ## References
 

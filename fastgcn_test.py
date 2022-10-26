@@ -85,11 +85,11 @@ if __name__=="__main__":
     X = row_normalize(X) if args.norm_feat else X
 
     # Create the adjacency matrix
-    data.edge_index = utils.add_self_loops(data.edge_index)[0]
     numpy_edges = data.edge_index.numpy()
     csr_edge_list = sp.csr_matrix((np.ones(data.edge_index.shape[1]), # data
                                    (numpy_edges[0], numpy_edges[1])), # (row, col)
                                   shape=(X.shape[0], X.shape[0])) # size
+    csr_edge_list += sp.identity(X.shape[0], format='csr')
 
     # Normalize the adjacency matrix
     adjmat = normalize_adj(csr_edge_list)

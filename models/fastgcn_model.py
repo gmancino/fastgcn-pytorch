@@ -61,7 +61,6 @@ class FastGCN(nn.Module):
         # Save the sampler
         self.samp_probs = samp_probs
         self.num_nodes = num_nodes
-        # self.tensor_probs = torch.tensor(samp_probs).to(self.device).float().unsqueeze(1) / sum(samp_probs)
 
         # Save the global adjacency matrix for full batch GCN
         self.full_adj = None
@@ -165,7 +164,7 @@ class FastGCN(nn.Module):
                     else:
                         x = self.activation(p(x, batch_adjs[ind]))
 
-            # Return the result
+        # Return the result
         return x, init_batch
 
     @torch.no_grad()
@@ -181,7 +180,7 @@ class FastGCN(nn.Module):
         adj_out_mats = []
 
         # Get the next layer of nodes
-        new_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+        new_nodes = np.unique(csr_adj_mat[batch[0], :].indices)
 
         # Get only the subset of nodes that are 1-hop away
         new_nodes = np.setdiff1d(new_nodes, batch[0])
@@ -206,7 +205,7 @@ class FastGCN(nn.Module):
             adj_out_mats.append(csr_to_torch_coo(csr_adj_mat[batch[i - 1], :][:, batch[i]].multiply(1. / (subgraph_probs * len(subgraph_probs)))).to(self.device))
 
             # Get the next layer of nodes
-            new_nodes = np.unique(csr_adj_mat[batch[i], :].nonzero()[1])
+            new_nodes = np.unique(csr_adj_mat[batch[i], :].indices)
 
             # Get only the subset of nodes that are 1-hop away
             new_nodes = np.setdiff1d(new_nodes, batch[i])
@@ -230,7 +229,7 @@ class FastGCN(nn.Module):
         adj_out_mats = []
 
         # Get the next layer of nodes
-        new_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+        new_nodes = np.unique(csr_adj_mat[batch[0], :].indices)
 
         # Loop over the remaining batches
         for i in range(1, len(batch_sizes)):
@@ -253,7 +252,7 @@ class FastGCN(nn.Module):
                 self.device))
 
             # Get the next layer of nodes
-            new_nodes = np.unique(csr_adj_mat[batch[i], :].nonzero()[1])
+            new_nodes = np.unique(csr_adj_mat[batch[i], :].indices)
 
         # Initial layer of the adjacency matrix involves pre-computation,
         # but we already store this, so we only need to slice!
@@ -274,7 +273,7 @@ class FastGCN(nn.Module):
         adj_out_mats = []
 
         # Get the next layer of nodes
-        all_next_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+        all_next_nodes = np.unique(csr_adj_mat[batch[0], :].indices)
 
         # Get only the subset of nodes that are 1-hop away
         new_nodes = np.setdiff1d(all_next_nodes, batch[0])
@@ -304,7 +303,7 @@ class FastGCN(nn.Module):
                 self.device))
 
             # Get the next layer of nodes
-            all_next_nodes = np.unique(csr_adj_mat[sampled, :].nonzero()[1])
+            all_next_nodes = np.unique(csr_adj_mat[sampled, :].indices)
 
             # Get only the subset of nodes that are 1-hop away
             new_nodes = np.setdiff1d(all_next_nodes, sampled)
@@ -329,7 +328,7 @@ class FastGCN(nn.Module):
         adj_out_mats = []
 
         # Get the next layer of nodes
-        all_next_nodes = np.unique(csr_adj_mat[batch[0], :].nonzero()[1])
+        all_next_nodes = np.unique(csr_adj_mat[batch[0], :].indices)
 
         # Get only the subset of nodes that are 1-hop away
         new_nodes = np.setdiff1d(all_next_nodes, batch[0])
@@ -358,7 +357,7 @@ class FastGCN(nn.Module):
                 self.device))
 
             # Get the next layer of nodes
-            all_next_nodes = np.unique(csr_adj_mat[batch[i], :].nonzero()[1])
+            all_next_nodes = np.unique(csr_adj_mat[batch[i], :].indices)
 
             # Get only the subset of nodes that are 1-hop away
             new_nodes = np.setdiff1d(all_next_nodes, batch[i])
@@ -396,7 +395,7 @@ class FastGCN(nn.Module):
         for i in range(num_inference_times):
 
             # Then compute the subgraphs
-            batch_adjs = self.get_subgraphs(init_batch=init_batch,
+            batch_adjs = self.get_subgraphs_concated_sampling(init_batch=init_batch,
                                             batch_sizes=batch_sizes[1:],
                                             csr_adj_mat=csr_mat)
 
