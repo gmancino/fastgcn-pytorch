@@ -29,7 +29,8 @@ class FastGCN(nn.Module):
     """
 
     def __init__(self, input_dim: int, hidden_dims: typing.List[int], output_dim: int,
-                 dropout: float, samp_probs: np.array = None, num_nodes: int = None,
+                 csr_mat: sp.csr_matrix, x: torch.Tensor,
+                 dropout: float = 0.0, samp_probs: np.array = None,
                  device: typing.Optional = torch.device("cpu")):
 
         # Declare super
@@ -60,11 +61,13 @@ class FastGCN(nn.Module):
 
         # Save the sampler
         self.samp_probs = samp_probs
-        self.num_nodes = num_nodes
 
         # Save the global adjacency matrix for full batch GCN
-        self.full_adj = None
-        self.precompute = None
+        self.full_adj = csr_to_torch_coo(csr_mat).to(self.device)
+        self.precompute = torch.sparse.mm(self.full_adj, x)
+
+        # Save the random generator
+        self.rng = np.random.default_rng()
 
     def forward(self, x: torch.Tensor,
                 csr_mat: sp.csr_matrix,
@@ -76,14 +79,6 @@ class FastGCN(nn.Module):
 
         # One way is to perform full pass
         if stochastic is False:
-
-            # Create adjacency matrix
-            if self.full_adj is None:
-                self.full_adj = csr_to_torch_coo(csr_mat).to(self.device)
-
-            # Perform pre-computation
-            if self.precompute is None:
-                self.precompute = torch.sparse.mm(self.full_adj, x)
 
             # No sampling is performed
             init_batch = None
@@ -116,7 +111,7 @@ class FastGCN(nn.Module):
         else:
 
             # First get one batch
-            init_batch = np.random.choice(possible_training_nodes,
+            init_batch = self.rng.choice(possible_training_nodes,
                                         size=batch_sizes[0],
                                         replace=False)
 
@@ -124,16 +119,6 @@ class FastGCN(nn.Module):
             batch_adjs = self.get_subgraphs_concated_sampling(init_batch=init_batch,
                                                      batch_sizes=batch_sizes[1:],
                                                      csr_adj_mat=csr_mat)
-
-            # Perform precomputation
-            if self.precompute is None:
-
-                # Create adjacency matrix
-                if self.full_adj is None:
-                    self.full_adj = csr_to_torch_coo(csr_mat).to(self.device)
-
-                # Save precomputation
-                self.precompute = torch.sparse.mm(self.full_adj, x)
 
             # Propagate through the network
             for ind, p in enumerate(self.layers):
@@ -195,7 +180,7 @@ class FastGCN(nn.Module):
             probs = self.samp_probs[new_nodes] / denom
 
             # Get a batch
-            batch.append(np.random.choice(new_nodes, size=batch_sizes[i],
+            batch.append(self.rng.choice(new_nodes, size=batch_sizes[i],
                                                        replace=False, p=probs))
 
             # Create the probability distribution over these nodes
@@ -240,7 +225,7 @@ class FastGCN(nn.Module):
             probs = self.samp_probs[new_nodes] / denom
 
             # Get a batch
-            batch.append(np.random.choice(new_nodes, size=batch_sizes[i],
+            batch.append(self.rng.choice(new_nodes, size=batch_sizes[i],
                                           replace=False, p=probs))
 
             # Create the probability distribution over these nodes
@@ -277,7 +262,7 @@ class FastGCN(nn.Module):
 
         # Get only the subset of nodes that are 1-hop away
         new_nodes = np.setdiff1d(all_next_nodes, batch[0])
-        old_nodes = np.setdiff1d(all_next_nodes, new_nodes)
+        old_nodes = batch[0].copy()
 
         # Loop over the remaining batches
         for i in range(1, len(batch_sizes)):
@@ -289,7 +274,7 @@ class FastGCN(nn.Module):
             probs = self.samp_probs[new_nodes] / denom
 
             # Get a batch
-            sampled = np.random.choice(new_nodes, size=min(batch_sizes[i], len(probs)),
+            sampled = self.rng.choice(new_nodes, size=min(batch_sizes[i], len(probs)),
                                           replace=False, p=probs)
 
             batch.append(np.concatenate((sampled, old_nodes)))
@@ -307,7 +292,7 @@ class FastGCN(nn.Module):
 
             # Get only the subset of nodes that are 1-hop away
             new_nodes = np.setdiff1d(all_next_nodes, sampled)
-            old_nodes = np.setdiff1d(all_next_nodes, new_nodes)
+            old_nodes = sampled.copy()
 
         # Initial layer of the adjacency matrix involves pre-computation,
         # but we already store this, so we only need to slice!
@@ -343,7 +328,7 @@ class FastGCN(nn.Module):
             probs = self.samp_probs[new_nodes] / denom
 
             # Get a batch
-            sampled = np.random.choice(new_nodes, size=min(batch_sizes[i], len(probs)),
+            sampled = self.rng.choice(new_nodes, size=min(batch_sizes[i], len(probs)),
                                        replace=False, p=probs)
 
             batch.append(np.concatenate((sampled, batch[0])))

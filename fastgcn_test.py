@@ -97,8 +97,8 @@ if __name__=="__main__":
     # ------------------------------------------------
     # Declare the model and optimizer
     model = FastGCN(input_dim=X.shape[1], hidden_dims=args.hidden_dim, output_dim=max(y).item() + 1, dropout=args.drop,
+                csr_mat=adjmat, x=X,
                 samp_probs=np.ones((len(y),)) if args.samp_dist == 'uniform' else np.asarray(adjmat.multiply(adjmat).sum(1)).flatten(),
-                num_nodes=len(y),
                 device=user_device
                 )
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
@@ -125,21 +125,22 @@ if __name__=="__main__":
 
     if args.fast:
         print(f"[BATCH] batch size: {args.init_batch}")
-        print(f"[SAMP] layer sample size: {args.sample_size}\n")
+        print(f"[SAMP] layer sample size: {args.sample_size}")
 
     # Set the training masks
     stochastic = args.fast
     training_mask = torch.tensor([True] * len(y))
     training_mask = training_mask * (data.test_mask == False) * (data.val_mask == False)
     training_mask = training_mask.to(user_device)
-    training_indices = torch.where(training_mask == True)[0].tolist()
-    testing_indices = torch.where(data.test_mask == True)[0].tolist()
-    validation_indices = torch.where(data.val_mask == True)[0].tolist()
+    training_indices = torch.where(training_mask == True)[0].cpu().numpy()
+    testing_indices = torch.where(data.test_mask == True)[0].cpu().numpy()
+    validation_indices = torch.where(data.val_mask == True)[0].cpu().numpy()
 
     # Perform the for loop over the iterations
     max_acc = 0
     running_time = 0
     for i in range(args.epochs):
+
         # Perform training
         t0 = time.time()
         loss_hist = train(model, optimizer, X, y, adjmat, training_mask, criteria, stochastic, loss_hist,

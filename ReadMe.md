@@ -20,7 +20,7 @@ Here we discuss several training/implementation differences from the original Fa
 4. **Importance sampling**: we implement importance sampling by using the (squared) 2-norm of each column in the adjacency matrix.
 5. **Dataset split**: we follow the practice of [1] in terms of dataset training/validation/testing split: all nodes that do not belong to the testing or validation set are used as training nodes.
 6. **Batch/sample size**: all of our tests use a standard 2-layer GCN architecture; for all datasets, we compute the loss over a mini-batch of 256 training nodes and sample 400 nodes at the next layer (except for Reddit, which uses a mini-batch of 1024 and samples 5120 nodes at the next layer). Notice there is no sampling after this (even though this is a 2-layer GCN) as we use pre-computation on the input layer.
-7. **Other hyperparameters**: we train all models for 200 iterations with the Adam optimizer using a learning rate of 0.01 and employ early stopping if the validation loss does not decrease for 10 iterations (except for Reddit, which is set to 50 iterations). Weight decay is applied (l_2 regularization), row features are normalized only for PubMed, and no dropout is applied. For Cora, PubMed, and CiteSeer the hidden dimension is 16. For Reddit, the hidden dimension is 128.
+7. **Other hyperparameters**: we train all models for 200 iterations with the Adam optimizer using a learning rate of 0.01 and employ early stopping if the validation loss does not decrease for 10 iterations (20 in the case of Reddit). Weight decay is applied (l_2 regularization), row features are normalized only for PubMed, and no dropout is applied. For Cora, PubMed, and CiteSeer the hidden dimension is 16. For Reddit, the hidden dimension is 128.
 8. **Inference**: we perform inference using all of the nodes in the network (i.e. a forward pass of the un-batched GCN model is used to perform inference); this is done for both computing the validation loss and computing the testing accuracy.
 
 ## Results
@@ -46,9 +46,9 @@ TRAINING INFORMATION:
 [STOP] early stopping at iteration: 57
 
 RESULTS:
-[LOSS] minimum loss: 0.13632288575172424
-[ACC] maximum micro F1 testing accuracy: 87.4 %
-[TIME] 0.8241 seconds
+[LOSS] minimum loss: 0.14825539290905
+[ACC] maximum micro F1 testing accuracy: 87.8 %
+[TIME] 0.7757 seconds
 ========================== ENDING TRAINING ==========================
 ```
 
@@ -61,10 +61,10 @@ We compare the current approach with the original GCN and report the _maximum te
 
 | Dataset | FastGCN | GCN |
 | --- | --- | --- |
-| Cora | 87.4% (0.81 s) | 87.2% (0.56 s) |
-| CiteSeer | 78.4% (0.57 s) | 78.7% (0.47 s) |
-| PubMed | 88.3% (1.49 s) | 88.5% (1.4 s) |
-| Reddit | 94.4% (48.19 s) | 94.8% (330.5 s) |
+| Cora | 87.5% (0.77 s) | 87.0% (0.62 s) |
+| CiteSeer | 78.4% (0.58 s) | 78.7% (0.47 s) |
+| PubMed | 88.3% (1.27 s) | 88.5% (1.4 s) |
+| Reddit | 94.5% (31.9 s) | 94.9% (323.6 s) |
 
 ## References
 
