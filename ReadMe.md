@@ -57,17 +57,19 @@ Example convergence curves (in terms of loss and accuracy) are given here:
 ![Loss curves](results/Cora_train_loss.png)
 ![Accuracy curve](results/Cora_testing_accuracy.png)
 
-We compare the current approach with the original GCN and report the _maximum testing accuracy_ and the _total_ training time (no inference time is reported) averaged over 3 independent initializations on all datasets besides Reddit (with which we perform 1 trial, due to the timing). Results are reported in the following table:
+We compare the current approach with the original GCN and report the _maximum testing accuracy_, the _per-iteration_ training time, and the _total_ training time (no inference time is reported) averaged over 3 independent initializations on all datasets besides Reddit (with which we perform 1 trial, due to the timing). The final column uses sampling in the inference phase as in [3], where the batch size is kept the same as in the training phase, but the sampled size at the second layer is 1280, 2560, 2560, and 15360, respectively. Results are reported in the following table:
 
-| Dataset | FastGCN | GCN |
-| --- | --- | --- |
-| Cora | 87.5% (0.77 s) | 87.0% (0.62 s) |
-| CiteSeer | 78.4% (0.58 s) | 78.7% (0.47 s) |
-| PubMed | 88.3% (1.27 s) | 88.5% (1.4 s) |
-| Reddit | 94.5% (31.9 s) | 94.9% (323.6 s) |
+| Dataset | FastGCN | GCN | FastGCN (sampled inference) |
+| --- | --- | --- | --- |
+| Cora | 87.5% (0.0071s / 0.77s) | 87.0% (0.0048s / 0.58s) | 87.9% (0.0071s / 0.77s)  |
+| CiteSeer | 78.4% (0.0071s / 0.58s) | 78.7% (0.0049s / 0.47s) | 79.3% (0.0071s / 0.56s)  |
+| PubMed | 88.3% (0.0075s / 1.27s) | 88.5% (0.0053s / 1.4s) |  88.3% (0.0075s / 1.3s)  |
+| Reddit | 94.5% (0.1663s / 33.3 s) | 94.8% (1.61s / 323.6s) |  92.7% (0.169s / 21.03s)  |
 
 ## References
 
 [1] Jie Chen, Tengfei Ma, and Cao Xiao. [FastGCN: Fast Learning with Graph Convolutional Networks via Importance Sampling](https://arxiv.org/abs/1801.10247). ICLR 2018.
 
 [2] Difan Zou, Ziniu Hu, Yewen Wang, Song Jiang, Yizhou Sun, and Quanquan Gu. [Layer-Dependent Importance Sampling for Training Deep and Large Graph Convolutional Networks](https://proceedings.neurips.cc/paper/2019/file/91ba4a4478a66bee9812b0804b6f9d1b-Paper.pdf). NeurIPS 2021.
+
+[3] Tim Kaler, Nickolas Stathas, Anne Ouyang, Alexandros-Stavros Iliopoulos, Tao B. Schardl, Charles E. Leiserson, and Jie Chen. [Accelerating Training and Inference of Graph Neural Networks with Fast Sampling and Pipelining](https://arxiv.org/pdf/2110.08450.pdf). MLSys Conference 2022.

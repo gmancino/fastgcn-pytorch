@@ -40,10 +40,10 @@ if __name__=="__main__":
 
     parser.add_argument('--epochs', type=int, default=200, help='Total number of updates rounds.')
     parser.add_argument('--hidden_dim', type=int, nargs='+', default=16, help='Dimension of the hidden layer.')
-    parser.add_argument('--sample_size', type=int, default=400, help='Sample size size.')
     parser.add_argument('--init_batch', type=int, default=256, help='Initial batch size.')
+    parser.add_argument('--sample_size', type=int, default=400, help='Sample size size.')
     parser.add_argument('--drop', type=float, default=0.0, help='Dropout rate.')
-    parser.add_argument('--dataset', type=str, default="Cora", choices=["Cora", "PubMed", "CiteSeer", "Reddit"],
+    parser.add_argument('--dataset', type=str, default="PubMed", choices=["Cora", "PubMed", "CiteSeer", "Reddit"],
                         help='Dataset to use.')
     parser.add_argument('--fast', type=str, default="true", choices=["true", "false"],
                         help='Use FastGCN or regular GCN.')
@@ -52,11 +52,16 @@ if __name__=="__main__":
     parser.add_argument('--wd', type=float, default=5e-4, help='Weight decay (l2 regularization).')
     parser.add_argument('--samp_dist', type=str, default='importance', choices=['importance', 'uniform'],
                         help='Which sampling distribution to use.')
-    parser.add_argument('--norm_feat', type=str, default='false', choices=['true', 'false'],
+    parser.add_argument('--norm_feat', type=str, default='true', choices=['true', 'false'],
                         help='Normalized features?')
     parser.add_argument('--samp_inference', type=str, default='false', choices=['true', 'false'],
                         help='Sample during inference phase for testing accuracy?')
     parser.add_argument('--num_samp_inference', type=int, default=1,
+                        help='Number of times to sample during inference.')
+    parser.add_argument('--inference_init_batch', type=int, default=256,
+                        help='Initial batch size for inference.')
+    parser.add_argument('--inference_sample_size', type=int, default=400, help='Sample size for inference.')
+    parser.add_argument('--use_cuda', type=str, default="true", choices=['true', 'false'],
                         help='Number of times to sample during inference.')
     parser.add_argument('--save_results', type=int, default=0, choices=[0, 1],
                         help='Save results or not (0 = do NOT save, 1 = save).')
@@ -65,10 +70,11 @@ if __name__=="__main__":
 
     # ------------------------------------------------
     # Get the device
-    user_device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    user_device = torch.device("cuda:0") if torch.cuda.is_available() and args.use_cuda == 'true' else torch.device("cpu")
     args.fast = True if args.fast == 'true' else False
     args.samp_inference = True if args.samp_inference == 'true' else False
     args.norm_feat = True if args.norm_feat == 'true' else False
+    args.early_stop = args.epochs + 1 if args.early_stop <= 0 else args.early_stop
 
     # ------------------------------------------------
     # Load the data - ToUndirected ensures that we can scan edge_list[0, :] to get all of the neighbors
@@ -104,6 +110,7 @@ if __name__=="__main__":
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
     criteria = nn.NLLLoss(reduction='mean')
     batches = [args.init_batch] + ([args.sample_size] * (len(model.layers) - 1))
+    inference_batches = [args.inference_init_batch] + ([args.inference_sample_size] * (len(model.layers) - 1))
 
     # ------------------------------------------------
     # Save meaningful results
@@ -127,6 +134,10 @@ if __name__=="__main__":
         print(f"[BATCH] batch size: {args.init_batch}")
         print(f"[SAMP] layer sample size: {args.sample_size}")
 
+    if args.samp_inference:
+        print(f"[INF BATCH] batch size: {args.inference_init_batch}")
+        print(f"[INF SAMP] layer sample size: {args.inference_sample_size}")
+
     # Set the training masks
     stochastic = args.fast
     training_mask = torch.tensor([True] * len(y))
@@ -139,20 +150,24 @@ if __name__=="__main__":
     # Perform the for loop over the iterations
     max_acc = 0
     running_time = 0
+    total_times = []
     for i in range(args.epochs):
 
         # Perform training
         t0 = time.time()
         loss_hist = train(model, optimizer, X, y, adjmat, training_mask, criteria, stochastic, loss_hist,
                         batches, training_indices)
-        running_time += time.time() - t0
+        t1 = time.time()
+        running_time += t1 - t0
+        if i > 0:
+            total_times.append(t1 - t0)
 
         # Perform testing and validation
         if args.samp_inference:
 
-            test_acc = sample_test(model, X, y, adjmat, batches, args.num_samp_inference, testing_indices, test_acc)
+            test_acc = sample_test(model, X, y, adjmat, inference_batches, args.num_samp_inference, testing_indices, test_acc)
 
-            val_hist = sample_validation_test(model, X, y, adjmat, batches, args.num_samp_inference, validation_indices, criteria, val_hist)
+            val_hist = sample_validation_test(model, X, y, adjmat, inference_batches, args.num_samp_inference, validation_indices, criteria, val_hist)
 
         # No sampling
         else:
@@ -173,7 +188,8 @@ if __name__=="__main__":
     print(f"RESULTS:")
     print(f"[LOSS] minimum loss: {min(loss_hist)}")
     print(f"[ACC] maximum micro F1 testing accuracy: {max_acc} %")
-    print(f"[TIME] {round(running_time, 4)} seconds")
+    print(f"[BATCH TIME] {round(sum(total_times) / len(total_times), 4)} seconds")
+    print(f"[TOTAL TIME] {round(running_time, 4)} seconds")
     print(f"{'=' * 26} ENDING TRAINING {'=' * 26}\n")
 
     # ------------------------------------------------

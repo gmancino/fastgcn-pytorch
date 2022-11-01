@@ -153,10 +153,10 @@ def sample_test(model: nn.Module, X: torch.Tensor, y: torch.Tensor, csr_mat: sp.
 
     # Set to test
     model.eval()
-    acc = 0
 
     # Loop over all of the indices
-    c = 0
+    total_out = np.array([])
+    total_y = np.array([])
     for i in range(0, len(mask), batch_list[0]):
 
         # Get this subset of nodes to perform prediction on
@@ -166,11 +166,11 @@ def sample_test(model: nn.Module, X: torch.Tensor, y: torch.Tensor, csr_mat: sp.
         out, res, init_batch = model.sample_predict(x=X, csr_mat=csr_mat,
                             init_batch=m, batch_sizes=batch_list, num_inference_times=num_samp_inf)
 
-        acc += F1(y[init_batch].cpu().numpy(), out.cpu().numpy(), average='micro') * 100.0
-        c += 1
+        total_out = np.concatenate((total_out, out.cpu().numpy())).flatten()
+        total_y = np.concatenate((total_y, y[init_batch].cpu().numpy())).flatten()
 
     # Save the accuracy
-    accuracy.append(acc / c)
+    accuracy.append(F1(total_y, total_out, average='micro') * 100.0)
 
     return accuracy
 
