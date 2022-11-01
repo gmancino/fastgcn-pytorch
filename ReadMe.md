@@ -59,12 +59,15 @@ Example convergence curves (in terms of loss and accuracy) are given here:
 
 We compare the current approach with the original GCN and report the _maximum testing accuracy_, the _per-iteration_ training time, and the _total_ training time (no inference time is reported) averaged over 3 independent initializations on all datasets besides Reddit (with which we perform 1 trial, due to the timing). The final column uses sampling in the inference phase as in [3], where the batch size is kept the same as in the training phase, but the sampled size at the second layer is 1280, 2560, 2560, and 15360, respectively. Results are reported in the following table:
 
-| Dataset | FastGCN | GCN | FastGCN (sampled inference) |
-| --- | --- | --- | --- |
-| Cora | 87.5% (0.0071s / 0.77s) | 87.0% (0.0048s / 0.58s) | 87.9% (0.0071s / 0.77s)  |
-| CiteSeer | 78.4% (0.0071s / 0.58s) | 78.7% (0.0049s / 0.47s) | 79.3% (0.0071s / 0.56s)  |
-| PubMed | 88.3% (0.0075s / 1.27s) | 88.5% (0.0053s / 1.4s) |  88.3% (0.0075s / 1.3s)  |
-| Reddit | 94.5% (0.1663s / 33.3 s) | 94.8% (1.61s / 323.6s) |  92.7% (0.169s / 21.03s)  |
+```
+|          | FastGCN (full-batch inference) | GCN (full-batch inference) | FastGCN (mini-batch inference) |
+| Dataset  | acc     | per-epoch  | total   | acc   | per-epoch | total  | acc     | per-epoch  | total   |
+| -------- | ------- | ---------- | ------- | ----- | --------- | ------ | ------- | ---------- | ------- |
+| Cora     | 87.5%   | 0.0071s    | 0.77s   | 87.0% | 0.0048s   | 0.58s  | 87.9%   | 0.0071s    | 0.77s   |
+| CiteSeer | 78.4%   | 0.0071s    | 0.58s   | 78.7% | 0.0049s   | 0.47s  | 79.3%   | 0.0071s    | 0.56s   |
+| PubMed   | 88.3%   | 0.0075s    | 1.27s   | 88.5% | 0.0053s   | 1.4s   | 88.3%   | 0.0075s    | 1.3s    |
+| Reddit   | 94.5%   | 0.1663s    | 33.3s   | 94.8% | 1.61s     | 323.6s | 92.7%   | 0.169s     | 21.03s  |
+```
 
 ## References
 
