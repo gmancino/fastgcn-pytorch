@@ -28,7 +28,7 @@ Here we discuss several training/implementation differences from the original Fa
 Testing the code on the Cora dataset with the following command should yield the following output:
 
 ```
-python fastgcn_test.py --dataset='Cora' --fast="true" --hidden_dim=16 --norm_feat="false" --lr=0.01 --init_batch=256 --sample_size=400
+python3 fastgcn_test.py --dataset='Cora' --fast="true" --hidden_dim=16 --norm_feat="false" --lr=0.01 --init_batch=256 --sample_size=400
 
 # OUTPUT
 ========================= STARTING TRAINING =========================
@@ -75,10 +75,10 @@ To reproduce the above table, please run the commands below. The 'Command (full-
 
 | Dataset | Command (full-batch inference) | mini-batch inference |
 | --- | --- | --- |
-| Cora | `python3 fastgcn_test.py --dataset='Cora' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=1280` |
-| CiteSeer | `python3 fastgcn_test.py --dataset='CiteSeer' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560` |
-| PubMed | `python3 fastgcn_test.py --dataset='PubMed' --norm_feat='true' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560` |
-| Reddit | `python3 fastgcn_test.py --dataset='Reddit' --norm_feat='false' --fast='true' --hidden_dim=128 --init_batch=1024 --sample_size=5120 --early_stop=20 --wd=1e-4` | `--samp_inference='true' --inference_init_batch=1024 --inference_sample_size=15360` |
+| Cora | ```python3 fastgcn_test.py --dataset='Cora' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4``` | ```--samp_inference='true' --inference_init_batch=256 --inference_sample_size=1280``` |
+| CiteSeer | ```python3 fastgcn_test.py --dataset='CiteSeer' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4``` | ```--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560``` |
+| PubMed | ```python3 fastgcn_test.py --dataset='PubMed' --norm_feat='true' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4``` | ```--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560``` |
+| Reddit | ```python3 fastgcn_test.py --dataset='Reddit' --norm_feat='false' --fast='true' --hidden_dim=128 --init_batch=1024 --sample_size=5120 --early_stop=20 --wd=1e-4``` | ```--samp_inference='true' --inference_init_batch=1024 --inference_sample_size=15360``` |
 
 ## References
 
