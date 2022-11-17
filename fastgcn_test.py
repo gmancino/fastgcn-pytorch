@@ -38,22 +38,29 @@ if __name__=="__main__":
     # Parse user arguments
     parser = argparse.ArgumentParser(description='Test the FastGCN paper method for node classification.')
 
-    parser.add_argument('--epochs', type=int, default=200, help='Total number of updates rounds.')
+    # DATA
+    parser.add_argument('--dataset', type=str, default="PubMed", choices=["Cora", "PubMed", "CiteSeer", "Reddit"],
+                        help='Dataset to use.')
+    parser.add_argument('--norm_feat', type=str, default='true', choices=['true', 'false'],
+                        help='Normalized features?')
+
+    # METHOD + ARCHITECTURE
+    parser.add_argument('--fast', type=str, default="true", choices=["true", "false"],
+                        help='Use FastGCN or regular GCN.')
     parser.add_argument('--hidden_dim', type=int, nargs='+', default=16, help='Dimension of the hidden layer.')
     parser.add_argument('--init_batch', type=int, default=256, help='Initial batch size.')
     parser.add_argument('--sample_size', type=int, default=400, help='Sample size size.')
-    parser.add_argument('--drop', type=float, default=0.0, help='Dropout rate.')
-    parser.add_argument('--dataset', type=str, default="PubMed", choices=["Cora", "PubMed", "CiteSeer", "Reddit"],
-                        help='Dataset to use.')
-    parser.add_argument('--fast', type=str, default="true", choices=["true", "false"],
-                        help='Use FastGCN or regular GCN.')
+    parser.add_argument('--samp_dist', type=str, default='importance', choices=['importance', 'uniform'],
+                        help='Which sampling distribution to use.')
+
+    # TRAINING
+    parser.add_argument('--epochs', type=int, default=200, help='Total number of updates rounds.')
     parser.add_argument('--lr', type=float, default=0.01, help='Adam learning rate.')
     parser.add_argument('--early_stop', type=int, default=10, help='Early stopping term.')
     parser.add_argument('--wd', type=float, default=5e-4, help='Weight decay (l2 regularization).')
-    parser.add_argument('--samp_dist', type=str, default='importance', choices=['importance', 'uniform'],
-                        help='Which sampling distribution to use.')
-    parser.add_argument('--norm_feat', type=str, default='true', choices=['true', 'false'],
-                        help='Normalized features?')
+    parser.add_argument('--drop', type=float, default=0.0, help='Dropout rate.')
+
+    # INFERENCE
     parser.add_argument('--samp_inference', type=str, default='false', choices=['true', 'false'],
                         help='Sample during inference phase for testing accuracy?')
     parser.add_argument('--num_samp_inference', type=int, default=1,
@@ -61,6 +68,8 @@ if __name__=="__main__":
     parser.add_argument('--inference_init_batch', type=int, default=256,
                         help='Initial batch size for inference.')
     parser.add_argument('--inference_sample_size', type=int, default=400, help='Sample size for inference.')
+
+    # EXTRAS
     parser.add_argument('--use_cuda', type=str, default="true", choices=['true', 'false'],
                         help='Number of times to sample during inference.')
     parser.add_argument('--save_results', type=int, default=0, choices=[0, 1],

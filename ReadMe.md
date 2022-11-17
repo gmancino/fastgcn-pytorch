@@ -69,6 +69,17 @@ We compare the current approach with the original GCN and report the _maximum te
 | Reddit   | 94.5%   | 0.1663s    | 33.3s   | 94.8% | 1.61s     | 323.6s | 92.7%   | 0.169s     | 21.03s  |
 ```
 
+#### Command line instructions
+
+To reproduce the above table, please run the commands below. The 'Command (full-batch inference)' commands will reproduce the values from the first column above; changing the respective argument to `--fast='false'` will reproduce the second; and adding the arguments from the 'mini-batch inference' column will reproduce the third column above (**note**: `--fast='true'` in this case).
+
+| Dataset | Command (full-batch inference) | mini-batch inference |
+| --- | --- | --- |
+| Cora | `python3 fastgcn_test.py --dataset='Cora' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=1280` |
+| CiteSeer | `python3 fastgcn_test.py --dataset='CiteSeer' --norm_feat='false' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560` |
+| PubMed | `python3 fastgcn_test.py --dataset='PubMed' --norm_feat='true' --fast='true' --hidden_dim=16 --init_batch=256 --sample_size=400 --early_stop=10 --wd=5e-4` | `--samp_inference='true' --inference_init_batch=256 --inference_sample_size=2560` |
+| Reddit | `python3 fastgcn_test.py --dataset='Reddit' --norm_feat='false' --fast='true' --hidden_dim=128 --init_batch=1024 --sample_size=5120 --early_stop=20 --wd=1e-4` | `--samp_inference='true' --inference_init_batch=1024 --inference_sample_size=15360` |
+
 ## References
 
 [1] Jie Chen, Tengfei Ma, and Cao Xiao. [FastGCN: Fast Learning with Graph Convolutional Networks via Importance Sampling](https://arxiv.org/abs/1801.10247). ICLR 2018.
